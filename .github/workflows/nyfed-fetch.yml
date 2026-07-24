@@ -1,0 +1,26 @@
+name: NY Fed Markets Data Daily Fetch
+
+on:
+  schedule:
+    - cron: "0 21 * * 1-5"   # 21:00 UTC (5:00pm ET), weekdays
+  workflow_dispatch: {}       # manual "Run workflow" button for testing
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install requests pandas
+      - run: python scripts/nyfed_fetch.py
+      - name: Commit updated caches
+        run: |
+          git config user.name "nyfed-data-bot"
+          git config user.email "actions@github.com"
+          git add data/nyfed/
+          git diff --staged --quiet || git commit -m "Daily NY Fed data update"
+          git push
