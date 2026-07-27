@@ -1,5 +1,7 @@
 effectiveDate,type,percentRate,percentPercentile1,percentPercentile25,percentPercentile75,percentPercentile99,volumeInBillions,revisionIndicator
 2025-07-22,SOFR,4.28,4.25,4.27,4.33,4.36,2692,
+2025-07-23,SOFR,4.28,4.25,4.27,4.33,4.36,2659,
+2026-07-24,SOFR,3.64,3.59,3.62,3.69,3.72,2979,
 2026-07-23,SOFR,3.64,3.58,3.62,3.7,3.72,2971,
 2026-07-22,SOFR,3.62,3.56,3.6,3.67,3.7,3026,
 2026-07-21,SOFR,3.61,3.56,3.58,3.66,3.69,2975,
@@ -249,4 +251,3 @@ effectiveDate,type,percentRate,percentPercentile1,percentPercentile25,percentPer
 2025-07-28,SOFR,4.36,4.31,4.35,4.43,4.47,2783,
 2025-07-25,SOFR,4.36,4.3,4.35,4.43,4.47,2766,
 2025-07-24,SOFR,4.3,4.27,4.29,4.36,4.39,2725,
-2025-07-23,SOFR,4.28,4.25,4.27,4.33,4.36,2659,
