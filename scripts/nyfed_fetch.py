@@ -5,20 +5,15 @@ Pulls NY Fed Reference Rates (SOFR/EFFR/OBFR/TGCR/BGCR) and Primary Dealer
 Statistics (the full survey dataset) from the public Markets Data API.
 No API key required. Caches each to CSV with dedupe.
 """
-
 import sys
 import datetime as dt
 from pathlib import Path
 from io import StringIO
-
 import requests
 import pandas as pd
-
 CACHE_DIR = Path("data/nyfed")
 BASE = "https://markets.newyorkfed.org/api"
-
 HEADERS = {"User-Agent": "research-script/1.0 (personal, non-commercial use)"}
-
 # Reference Rates: (rate_type, category) -> filename
 RATE_SERIES = {
     "sofr":   ("secured", "sofr_daily.csv"),
@@ -27,17 +22,22 @@ RATE_SERIES = {
     "effr":   ("unsecured", "effr_daily.csv"),
     "obfr":   ("unsecured", "obfr_daily.csv"),
 }
-
 PD_ALL_TIMESERIES_URL = f"{BASE}/pd/get/all/timeseries.csv"
 PD_LIST_TIMESERIES_URL = f"{BASE}/pd/list/timeseries.csv"
 
+DEALER_LEVERAGE_SERIES = [
+    "PDPOSGST-TOT",
+    "PDPOSCS-TOT",
+    "PDPOSMBS-TOT",
+    "PDPOSFGS-TOT",
+    "PDPOSABS-TOT",
+    "PDPOSSMGO-TOT",
+]
 
 def fetch_csv(url: str, params: dict = None) -> pd.DataFrame:
     resp = requests.get(url, headers=HEADERS, params=params, timeout=60)
     resp.raise_for_status()
     return pd.read_csv(StringIO(resp.text))
-
-
 def update_cache(df_new: pd.DataFrame, path: Path, dedupe_cols: list) -> pd.DataFrame:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
@@ -49,8 +49,6 @@ def update_cache(df_new: pd.DataFrame, path: Path, dedupe_cols: list) -> pd.Data
         merged = df_new
     merged.to_csv(path, index=False)
     return merged
-
-
 def fetch_reference_rates():
     for rate_type, (category, filename) in RATE_SERIES.items():
         url = f"{BASE}/rates/{category}/{rate_type}/last/250.json"
@@ -67,6 +65,29 @@ def fetch_reference_rates():
         print(f"  {rate_type.upper()}: {len(merged)} rows cached, latest = "
               f"{merged.iloc[-1].to_dict()}")
 
+def write_filtered_dealer_leverage(all_timeseries_path: Path):
+    """
+    Filters the full pd_all_timeseries.csv dump down to the *-TOT net
+    dealer position series and pivots to one row per date, one column
+    per series. Small and clean enough to actually index in project
+    knowledge, unlike the ~750k-row raw dump.
+    """
+    df = pd.read_csv(all_timeseries_path)
+    df = df[df["Time Series"].isin(DEALER_LEVERAGE_SERIES)]
+
+    wide = df.pivot_table(
+        index="As Of Date",
+        columns="Time Series",
+        values="Value (millions)",
+        aggfunc="last",  # dedupe safety net; shouldn't trigger given upstream dedupe
+    ).reset_index()
+
+    wide = wide[["As Of Date"] + DEALER_LEVERAGE_SERIES]
+    wide = wide.sort_values("As Of Date")
+
+    out_path = CACHE_DIR / "pd_dealer_leverage_filtered.csv"
+    wide.to_csv(out_path, index=False)
+    print(f"  Dealer leverage filtered file: {len(wide)} rows written to {out_path}")
 
 def fetch_primary_dealer_stats():
     """
@@ -81,7 +102,6 @@ def fetch_primary_dealer_stats():
     labels_path.parent.mkdir(parents=True, exist_ok=True)
     labels_df.to_csv(labels_path, index=False)  # static reference, overwrite is fine
     print(f"  Primary Dealer series labels: {len(labels_df)} series documented")
-
     df = fetch_csv(PD_ALL_TIMESERIES_URL)
     path = CACHE_DIR / "pd_all_timeseries.csv"
     dedupe_cols = [c for c in ["Time Series", "As Of Date"] if c in df.columns]
@@ -89,7 +109,7 @@ def fetch_primary_dealer_stats():
         dedupe_cols = list(df.columns[:2])
     merged = update_cache(df, path, dedupe_cols)
     print(f"  Primary Dealer Statistics: {len(merged)} rows cached")
-
+    write_filtered_dealer_leverage(path)
 
 def main():
     print(f"[{dt.datetime.now()}] Fetching NY Fed Markets Data...")
@@ -98,8 +118,6 @@ def main():
     print("Primary Dealer Statistics:")
     fetch_primary_dealer_stats()
     print("\nDone.")
-
-
 if __name__ == "__main__":
     try:
         main()
